@@ -1,0 +1,94 @@
+syntax = "proto2";
+
+package vse;
+
+import "common.proto";
+
+message NetId {
+	required int32 netId=1;
+}
+
+message Player {
+	required int32 netId=1;
+	required int32 clientId=2;
+}
+
+message Players {
+	repeated Player list = 1;
+	required int32 total=2;
+	required int32 masterId=3;
+}
+
+message GridStep {
+	message StepInfo {
+		required int32 netId=1;
+		required int32 addStep=2;
+		required int32 curStep=3;
+	}
+	repeated StepInfo stepInfos = 1;
+}
+
+message RollConfirm {
+	required int32 netId=1;
+}
+
+message BeginShoot{
+}
+
+message CreateMonster{
+		required int32 netId=1;
+		required int32 clientId=2;
+		required int32 targetId=3;
+		required int32 indexPos=4;
+}
+
+message PlayerMove {
+	required int32 sendId=1;
+	required int32 netId=2;
+	required Position pos = 3;
+	required Rotation rot = 4;
+}
+
+message PlayerAttack {
+	required int32 sendId=1;
+	required int32 netId=2;
+}
+
+message PlayerHurt {
+	required int32 sendId=1;
+	required int32 netId=2;
+}
+
+message PlayerDead {
+	required int32 sendId=1;
+	required int32 netId=2;
+}
+
+message CreateBullet{
+		required int32 buttleId = 1;
+		required Position pos = 2;
+		required Rotation rot = 3;
+}
+
+message ShowBoss {
+	required int32 show=1;
+}
+
+message CleanMonster {
+}
+
+message CreateEffect {
+	required int32 effectId=1;
+	required Position pos = 2;
+	required int32 localShow=3;	
+}
+
+message DestoryBoosBullet {
+	required int32 bulletId=1;
+}
+
+message PlayInfo {
+	required int32 netId=1;
+	required int32 hp=2;	
+}
+
