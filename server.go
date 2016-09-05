@@ -82,14 +82,13 @@ func getPlayersMessage() []byte {
 		}
 		players.List = append(players.List, &player)
 	}
-	log.Printf("%T,%v\n", players, players)
 	data, _ := proto.Marshal(&players)
 	return compose(int32(2), data)
 }
 
 func setPlayersNumber(rd *bufio.Reader) int32 {
 	in, err := rd.ReadBytes('\n')
-	if err != nil || len(in) > 2 || in[0] > '4' || in[0] < '1' {
+	if err != nil || in[0] > '4' || in[0] < '1' {
 		fmt.Println("wrong number, please input again:")
 		return setPlayersNumber(rd)
 	} else {
@@ -141,8 +140,6 @@ func compose(id int32, msg []byte) []byte {
 func int32ToBytes(num int32) []byte {
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.BigEndian, &num)
-	// buf := bytes.NewBuffer([]byte{})
-	// binary.Write(&buf, binary.BigEndian, &num)
 	return buf.Bytes()
 }
 

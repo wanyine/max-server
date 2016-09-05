@@ -13,7 +13,11 @@ import (
 )
 
 func main() {
-	conn, err := net.DialTimeout("tcp", "keen:7777", 3*time.Second)
+	if len(os.Args) < 2 {
+		log.Println("Please tell the address of servie, keen:7777 e.g.")
+		os.Exit(0)
+	}
+	conn, err := net.DialTimeout("tcp", os.Args[1], 3*time.Second)
 	if err != nil {
 		log.Fatal("connect failed", err)
 		os.Exit(-1)
