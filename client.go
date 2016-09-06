@@ -49,8 +49,8 @@ func main() {
 					NetId:    netId.NetId,
 					ClientId: &clientId,
 				}
-				data, _ = proto.Marshal(&player)
-				msg := append([]byte{0, 0, 0, 1}, data...)
+				buf, _ := proto.Marshal(&player)
+				msg := append([]byte{0, 0, 0, 1}, buf...)
 				conn.Write(append(proto.EncodeVarint(uint64(len(msg))), msg...))
 
 			case 2:
