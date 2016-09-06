@@ -50,16 +50,15 @@ func main() {
 					ClientId: &clientId,
 				}
 				data, _ = proto.Marshal(&player)
-				conn.Write(append([]byte{0, 0, 0, 1}, data...))
-				// what happens if write twice consistenly ? it seems message missed
-				// conn.Write([]byte{'o', 'k', 'a', 'y'})
+				msg := append([]byte{0, 0, 0, 1}, data...)
+				conn.Write(append(proto.EncodeVarint(uint64(len(msg))), msg...))
 
 			case 2:
 				players := &vse.Players{}
 				proto.Unmarshal(msg, players)
 				log.Println(players)
 			default:
-				log.Println(data[:n])
+				log.Println(data[:num])
 			}
 			beg += n + int(x)
 		}

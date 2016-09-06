@@ -1,74 +1,77 @@
 package main
 
 import (
+	"./vse"
 	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/golang/protobuf/proto"
 	"log"
 	"net"
 	"os"
-	// "strconv"
-	// "strings"
-	// "./max"
-	"./vse"
-	"github.com/golang/protobuf/proto"
+	"os/signal"
 )
+
+type Error string
+
+func (e Error) Error() string {
+	return string(e)
+}
 
 var bufMap = make(map[net.Conn](chan []byte))
 var players = vse.Players{}
 var roles = make(map[int32]int32)
 
 func main() {
+
 	service := ":7777"
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", service)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
-		os.Exit(1)
-	}
+	exitIfError(err)
+
 	listener, err := net.ListenTCP("tcp", tcpAddr)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
-		os.Exit(1)
-	}
-	// checkError(err)
+	exitIfError(err)
+
+	go onSignal(listener)
+
 	fmt.Println("Please input the players number(1-5):")
 	rd := bufio.NewReader(os.Stdin)
-	var num = setPlayersNumber(rd)
-	var master int32 = 0
-	fmt.Println("Waiting for connection...")
-
-	var id int32 = 0
+	num := setPlayersNumber(rd)
+	master := int32(0)
 	players.Total = &num
 	players.MasterId = &master
 	players.List = make([]*vse.Player, 0, num)
 
-	for ; id < num; id++ {
+	fmt.Println("Waiting for connection...")
+
+	for id := int32(0); ; id++ {
 		conn, err := listener.Accept()
-		if err != nil {
-			log.Fatal("connection error", err)
+		exitIfError(err)
+		fmt.Printf("netId %d connected\n", id)
+		if id < num {
+			bufMap[conn] = make(chan []byte)
+			go safelyHandle(conn)
+			netId := &vse.NetId{NetId: &id}
+			data, _ := proto.Marshal(netId)
+			write(conn, compose(int32(0), data))
+			write(conn, getPlayersMessage())
+		} else {
 			continue
 		}
-
-		fmt.Printf("netId %d connected\n", id)
-		bufMap[conn] = make(chan []byte)
-		go handleRequest(conn)
-
-		netId := &vse.NetId{NetId: &id}
-		data, _ := proto.Marshal(netId)
-
-		write(conn, compose(int32(0), data))
-		write(conn, getPlayersMessage())
 	}
 	fmt.Println("Players meet up, game started")
+}
 
-	err = listener.Close()
-	if err != nil {
-		log.Fatal("close listener failed", err)
+func onSignal(listener net.Listener) {
+	sigChan := make(chan os.Signal)
+	signal.Notify(sigChan)
+	<-sigChan
+	for conn, _ := range bufMap {
+		conn.Close()
 	}
-
-	for {
-	}
+	fmt.Println("close all connections.")
+	listener.Close()
+	fmt.Println("close listener.")
 }
 
 func getPlayersMessage() []byte {
@@ -96,39 +99,50 @@ func setPlayersNumber(rd *bufio.Reader) int32 {
 	}
 }
 
-func handleRequest(conn net.Conn) {
+func safelyHandle(conn net.Conn) {
 
 	go handleWirte(conn, bufMap[conn])
 
 	for {
 		buf := make([]byte, 1024)
-		l, e := conn.Read(buf)
-		if e != nil {
+		num, err := conn.Read(buf)
+		if err != nil {
+			log.Println(err)
 			continue
 		}
 
-		id := bytesToInt32(buf[:4])
-		switch id {
-		case 1:
-			msg := buf[4:l]
-			player := vse.Player{}
-			proto.Unmarshal(msg, &player)
-			if _, ok := roles[*(player.NetId)]; ok {
-				continue
-			} else {
-				roles[*(player.NetId)] = *(player.ClientId)
+		beg := 0
+		for beg < num {
+			x, n := proto.DecodeVarint(buf[beg:num])
+			id := bytesToInt32(buf[beg+n : beg+n+4])
+
+			switch id {
+			case 1:
+				msg := buf[beg+n+4 : beg+n+int(x)]
+				player := vse.Player{}
+				if e := proto.Unmarshal(msg, &player); e != nil {
+					log.Println(e)
+					continue
+				}
+				if _, ok := roles[*(player.NetId)]; ok {
+					continue
+				} else {
+					roles[*(player.NetId)] = *(player.ClientId)
+				}
+				broadcast(getPlayersMessage())
+			default:
+				fmt.Println(buf[:num])
+				broadcast(buf[:num])
 			}
-			broadcast(getPlayersMessage())
-		default:
-			fmt.Println(buf[:l])
-			broadcast(buf[:l])
+
+			beg += int(x) + n
 		}
 	}
 
-	defer func() { // will it be executed when exception occured?
-		conn.Close()
-		fmt.Println("close")
-		delete(bufMap, conn)
+	defer func() {
+		if err := recover(); err != nil {
+			log.Println(err)
+		}
 	}()
 }
 
@@ -169,5 +183,8 @@ func handleWirte(conn net.Conn, sendChan <-chan []byte) {
 	}
 }
 
-// func checkError(err string) {
-// }
+func exitIfError(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
