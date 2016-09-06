@@ -45,10 +45,13 @@ func main() {
 	fmt.Println("Waiting for connection...")
 
 	for id := int32(0); ; id++ {
+		if id == num {
+			fmt.Println("Players meet up, starting game")
+		}
 		conn, err := listener.Accept()
 		exitIfError(err)
-		fmt.Printf("netId %d connected\n", id)
 		if id < num {
+			fmt.Printf("netId %d connected\n", id)
 			bufMap[conn] = make(chan []byte)
 			go safelyHandle(conn)
 			netId := &vse.NetId{NetId: &id}
@@ -56,10 +59,10 @@ func main() {
 			write(conn, compose(int32(0), data))
 			write(conn, getPlayersMessage())
 		} else {
+			fmt.Printf("netId %d connected, but players have been full\n", id)
 			continue
 		}
 	}
-	fmt.Println("Players meet up, game started")
 }
 
 func onSignal(listener net.Listener) {
@@ -101,14 +104,21 @@ func setPlayersNumber(rd *bufio.Reader) int32 {
 
 func safelyHandle(conn net.Conn) {
 
+	defer func() {
+		if err := recover(); err != nil {
+			_ = err.(Error)
+			delete(bufMap, conn)
+			log.Println(err)
+		}
+	}()
+
 	go handleWirte(conn, bufMap[conn])
 
 	for {
 		buf := make([]byte, 1024)
 		num, err := conn.Read(buf)
 		if err != nil {
-			log.Println(err)
-			continue
+			panic(Error(err.Error()))
 		}
 
 		beg := 0
@@ -138,12 +148,6 @@ func safelyHandle(conn net.Conn) {
 			beg += int(x) + n
 		}
 	}
-
-	defer func() {
-		if err := recover(); err != nil {
-			log.Println(err)
-		}
-	}()
 }
 
 func compose(id int32, msg []byte) []byte {
