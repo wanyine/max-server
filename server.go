@@ -2,11 +2,11 @@ package main
 
 import (
 	"./vse"
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
 	"github.com/golang/protobuf/proto"
+	"github.com/robfig/config"
 	"log"
 	"net"
 	"os"
@@ -25,8 +25,13 @@ var roles = make(map[int32]int32)
 
 func main() {
 
-	service := ":7777"
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", service)
+	cfg, err := config.ReadDefault("config.ini")
+	exitIfError(err)
+
+	port, err := cfg.Int(config.DEFAULT_SECTION, "port")
+	exitIfError(err)
+
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", fmt.Sprintf(":%d", port))
 	exitIfError(err)
 
 	listener, err := net.ListenTCP("tcp", tcpAddr)
@@ -34,24 +39,28 @@ func main() {
 
 	go onSignal(listener)
 
-	fmt.Println("Please input the players number(1-5):")
-	rd := bufio.NewReader(os.Stdin)
-	num := setPlayersNumber(rd)
-	master := int32(0)
-	players.Total = &num
-	players.MasterId = &master
-	players.List = make([]*vse.Player, 0, num)
+	number, err := cfg.Int(config.DEFAULT_SECTION, "number")
+	exitIfError(err)
+	printfln("There are %d players totally", number)
 
+	master := int32(0)
+	total := int32(number)
+	players.Total = &total
+	players.MasterId = &master
+	players.List = make([]*vse.Player, 0, number)
 	fmt.Println("Waiting for connection...")
 
-	for id := int32(0); ; id++ {
-		if id == num {
+	for i := 0; ; i++ {
+		id := int32(i)
+		if i == number {
 			fmt.Println("Players meet up, starting game")
 		}
+
 		conn, err := listener.Accept()
 		exitIfError(err)
-		if id < num {
-			fmt.Printf("netId %d connected\n", id)
+
+		if i < number {
+			printfln("netId %d connected", id)
 			bufMap[conn] = make(chan []byte)
 			go safelyHandle(conn)
 			netId := &vse.NetId{NetId: &id}
@@ -59,7 +68,7 @@ func main() {
 			write(conn, compose(int32(0), data))
 			write(conn, getPlayersMessage())
 		} else {
-			fmt.Printf("netId %d connected, but players have been full\n", id)
+			printfln("netId %d connected, but players have been full", id)
 			continue
 		}
 	}
@@ -90,16 +99,6 @@ func getPlayersMessage() []byte {
 	}
 	data, _ := proto.Marshal(&players)
 	return compose(int32(2), data)
-}
-
-func setPlayersNumber(rd *bufio.Reader) int32 {
-	in, err := rd.ReadBytes('\n')
-	if err != nil || in[0] > '4' || in[0] < '1' {
-		fmt.Println("wrong number, please input again:")
-		return setPlayersNumber(rd)
-	} else {
-		return bytesToInt32(append([]byte{0, 0, 0}, in[0]-'0'))
-	}
 }
 
 func safelyHandle(conn net.Conn) {
@@ -185,6 +184,10 @@ func handleWirte(conn net.Conn, sendChan <-chan []byte) {
 			continue
 		}
 	}
+}
+
+func printfln(format string, a ...interface{}) (n int, err error) {
+	return fmt.Println(fmt.Sprintf(format, a))
 }
 
 func exitIfError(err error) {
