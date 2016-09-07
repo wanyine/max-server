@@ -4,6 +4,8 @@ import (
 	"./vse"
 	"bytes"
 	"encoding/binary"
+	"flag"
+	"fmt"
 	"github.com/golang/protobuf/proto"
 	"log"
 	"math/rand"
@@ -13,14 +15,20 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		log.Println("Please tell the address of servie, keen:7777 e.g.")
-		os.Exit(0)
+	var (
+		fHost = flag.String("host", "", "Host to dial")
+		fPort = flag.Int("port", 0, "Port to listen")
+	)
+	flag.Parse()
+	if *fHost == "" || *fPort == 0 {
+		fmt.Println("Example: go run client.go -host localhost -port 7777")
+		flag.PrintDefaults()
+		os.Exit(1)
 	}
-	conn, err := net.DialTimeout("tcp", os.Args[1], 3*time.Second)
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", *fHost, *fPort), 3*time.Second)
 	if err != nil {
 		log.Fatal("connect failed", err)
-		os.Exit(-1)
+		os.Exit(1)
 	}
 	log.Println("connected")
 	for {
@@ -39,15 +47,15 @@ func main() {
 			msg := data[beg+n+4 : beg+n+int(x)]
 			switch id {
 			case 0:
-				netId := &vse.NetId{}
-				proto.Unmarshal(msg, netId)
-				log.Println(netId)
+				netID := vse.NetId{}
+				proto.Unmarshal(msg, &netID)
+				log.Println(netID)
 
 				random := rand.New(rand.NewSource(99))
-				clientId := random.Int31() % 6
+				clientID := random.Int31() % 6
 				player := vse.Player{
-					NetId:    netId.NetId,
-					ClientId: &clientId,
+					NetId:    netID.NetId,
+					ClientId: &clientID,
 				}
 				buf, _ := proto.Marshal(&player)
 				msg := append([]byte{0, 0, 0, 1}, buf...)

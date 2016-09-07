@@ -78,7 +78,7 @@ func onSignal(listener net.Listener) {
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan)
 	<-sigChan
-	for conn, _ := range bufMap {
+	for conn := range bufMap {
 		conn.Close()
 	}
 	fmt.Println("close all connections.")
