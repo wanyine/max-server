@@ -83,7 +83,7 @@ func onSignal(listener net.Listener) {
 	}
 	fmt.Println("close all connections.")
 	listener.Close()
-	fmt.Println("close listener.")
+	log.Fatal("close listener and exit.")
 }
 
 func getPlayersMessage() []byte {
@@ -140,8 +140,9 @@ func safelyHandle(conn net.Conn) {
 				}
 				broadcast(getPlayersMessage())
 			default:
-				fmt.Println(buf[:num])
-				broadcast(buf[:num])
+				msg := buf[beg : beg+n+int(x)]
+				fmt.Println(msg)
+				broadcast(msg)
 			}
 
 			beg += int(x) + n

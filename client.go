@@ -38,8 +38,6 @@ func main() {
 			continue
 		}
 
-		log.Println(data[:num])
-
 		beg := 0
 		for beg < num {
 			x, n := proto.DecodeVarint(data[beg:num])
@@ -60,13 +58,15 @@ func main() {
 				buf, _ := proto.Marshal(&player)
 				msg := append([]byte{0, 0, 0, 1}, buf...)
 				conn.Write(append(proto.EncodeVarint(uint64(len(msg))), msg...))
+				msg = []byte{5, 0, 0, 0, 7, 1, 5, 0, 0, 0, 9, 2}
+				conn.Write(msg)
 
 			case 2:
 				players := &vse.Players{}
 				proto.Unmarshal(msg, players)
 				log.Println(players)
 			default:
-				log.Println(data[:num])
+				log.Println(data[beg : beg+n+int(x)])
 			}
 			beg += n + int(x)
 		}
